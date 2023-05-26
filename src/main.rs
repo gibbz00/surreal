@@ -16,8 +16,9 @@ async fn main() -> Result<()> {
     .await?;
     db.use_ns("namespace").use_db("database").await?;
 
-    enum_example(&db).await?;
-    insert_vec(&db).await?;
+    // enum_example(&db).await?;
+    // insert_vec(&db).await?;
+    insert_generic_struct(&db).await?;
 
     Ok(())
 }
@@ -72,6 +73,25 @@ async fn insert_vec(db: &Surreal<Client>) -> Result<()> {
     }
 
     let res: Vec<ParentStruct> = db.select("parent_struct").await?;
+    println!("{:#?}", res);
+    db.query("REMOVE TABLE parent_struct").await?;
+
+    Ok(())
+}
+
+async fn insert_generic_struct(db: &Surreal<Client>) -> Result<()> {
+    #[derive(Debug, Serialize, Deserialize)]
+    struct ParentStruct<T> {
+        data: T,
+    }
+
+    db.query("CREATE parent_struct SET data = $data")
+        .bind(ParentStruct::<Cow<'static, str>> {
+            data: "test".into(),
+        })
+        .await?;
+
+    let res: Vec<ParentStruct<Cow<'static, str>>> = db.select("parent_struct").await?;
     println!("{:#?}", res);
     db.query("REMOVE TABLE parent_struct").await?;
 
