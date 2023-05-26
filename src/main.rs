@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
         password: "root",
     })
     .await?;
-    db.use_ns("namespace").use_db("database").await?;
+    db.use_ns("unigis").use_db("testing").await?;
 
     enum_example(&db).await?;
     insert_generic_struct(&db).await?;
@@ -35,7 +35,7 @@ async fn enum_example(db: &Surreal<Client>) -> Result<()> {
         Village { number: usize },
     }
 
-    db.query("CREATE parent_struct SET designator = $designator")
+    db.query("CREATE address SET designator = $designator")
         .bind(Address {
             designator: Designator::Street {
                 number: 10,
@@ -44,15 +44,15 @@ async fn enum_example(db: &Surreal<Client>) -> Result<()> {
         })
         .await?;
 
-    db.query("CREATE parent_struct SET designator = $designator")
+    db.query("CREATE address SET designator = $designator")
         .bind(Address {
             designator: Designator::Village { number: 15 },
         })
         .await?;
 
-    let res: Vec<Address> = db.select("parent_struct").await?;
+    let res: Vec<Address> = db.select("address").await?;
     println!("{:#?}", res);
-    db.query("REMOVE TABLE parent_struct").await?;
+    db.query("REMOVE TABLE address").await?;
 
     Ok(())
 }
