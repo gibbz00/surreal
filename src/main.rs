@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use surrealdb::{
     engine::remote::ws::{Client, Ws},
     opt::auth::Root,
@@ -16,6 +17,7 @@ async fn main() -> Result<()> {
     db.use_ns("namespace").use_db("database").await?;
 
     enum_example(&db).await?;
+    insert_vec(&db).await?;
 
     Ok(())
 }
@@ -53,5 +55,25 @@ async fn enum_example(db: &Surreal<Client>) -> Result<()> {
     }
 
     db.query("REMOVE TABLE parent_struct").await?;
+    Ok(())
+}
+
+async fn insert_vec(db: &Surreal<Client>) -> Result<()> {
+    #[derive(Debug, Default, Serialize, Deserialize)]
+    struct ParentStruct {
+        data: Cow<'static, str>,
+    }
+
+    let parent_structs = vec![ParentStruct::default(), ParentStruct::default()];
+    for parent_struct in parent_structs {
+        db.query("CREATE parent_struct SET data = $data")
+            .bind(parent_struct)
+            .await?;
+    }
+
+    let res: Vec<ParentStruct> = db.select("parent_struct").await?;
+    println!("{:#?}", res);
+    db.query("REMOVE TABLE parent_struct").await?;
+
     Ok(())
 }
