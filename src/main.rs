@@ -1,12 +1,11 @@
+use geo::{LineString, Polygon};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, ops::Deref};
+use std::borrow::Cow;
 use surrealdb::{
     engine::remote::ws::{Client, Ws},
     opt::auth::Root,
-    sql::Uuid,
-    Result, Surreal,
+    Response, Result, Surreal,
 };
-use tokio::task;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -21,6 +20,7 @@ async fn main() -> Result<()> {
     enum_example(&db).await?;
     insert_generic_struct(&db).await?;
     insert_vec(&db).await?;
+    recognize_geo(&db).await?;
 
     Ok(())
 }
@@ -98,53 +98,79 @@ async fn insert_vec(db: &Surreal<Client>) -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test1() {
-    let db = DecoupledDatabase::new().await;
-    db.query("SELECT * FROM count(1)").await.unwrap();
-    db.drop().await;
+async fn recognize_geo(db: &Surreal<Client>) -> Result<()> {
+    let polygon: Polygon<f64> =
+        Polygon::new(LineString::from(vec![(0., 0.), (1., 1.), (1., 0.)]), vec![]);
+
+    let geojson_geometry: geojson::Geometry = (&polygon).into();
+
+    let res: Response = db
+        .query(format!("SELECT * FROM geo::area({})", geojson_geometry))
+        .await?;
+    println!("{:#?}", res);
+
+    Ok(())
 }
 
-#[tokio::test]
-async fn test2() {
-    let db = DecoupledDatabase::new().await;
-    db.query("SELECT * FROM count(1)").await.unwrap();
-    db.drop().await;
-}
+#[cfg(test)]
+mod tests {
+    use std::ops::Deref;
 
-struct DecoupledDatabase {
-    name: Uuid,
-    db: Surreal<Client>,
-}
+    use surrealdb::{
+        engine::remote::ws::{Client, Ws},
+        opt::auth::Root,
+        sql::Uuid,
+        Surreal,
+    };
 
-impl DecoupledDatabase {
-    pub async fn new() -> Self {
-        let name = Uuid::new_v4();
-        let db = Surreal::new::<Ws>("localhost:8000").await.unwrap();
-        db.signin(Root {
-            username: "root",
-            password: "root",
-        })
-        .await
-        .unwrap();
-        db.use_ns(name.simple().to_string())
-            .use_db("testing")
+    #[tokio::test]
+    async fn test1() {
+        let db = DecoupledDatabase::new().await;
+        db.query("SELECT * FROM count(1)").await.unwrap();
+        db.drop().await;
+    }
+
+    #[tokio::test]
+    async fn test2() {
+        let db = DecoupledDatabase::new().await;
+        db.query("SELECT * FROM count(1)").await.unwrap();
+        db.drop().await;
+    }
+
+    struct DecoupledDatabase {
+        name: Uuid,
+        db: Surreal<Client>,
+    }
+
+    impl DecoupledDatabase {
+        pub async fn new() -> Self {
+            let name = Uuid::new_v4();
+            let db = Surreal::new::<Ws>("localhost:8000").await.unwrap();
+            db.signin(Root {
+                username: "root",
+                password: "root",
+            })
             .await
             .unwrap();
-        DecoupledDatabase { name, db }
+            db.use_ns(name.simple().to_string())
+                .use_db("testing")
+                .await
+                .unwrap();
+            DecoupledDatabase { name, db }
+        }
+
+        // Workaround since async drop hasn't been implemented.
+        pub async fn drop(self) {
+            let sql = format!("REMOVE NAMESPACE {};", self.name.simple());
+            self.query(sql).await.unwrap();
+        }
     }
 
-    // Workaround since async drop hasn't been implemented.
-    pub async fn drop(self) {
-        let sql = format!("REMOVE NAMESPACE {};", self.name.simple());
-        self.query(sql).await.unwrap();
-    }
-}
+    impl Deref for DecoupledDatabase {
+        type Target = Surreal<Client>;
 
-impl Deref for DecoupledDatabase {
-    type Target = Surreal<Client>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.db
+        fn deref(&self) -> &Self::Target {
+            &self.db
+        }
     }
 }

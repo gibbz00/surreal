@@ -9,3 +9,5 @@ edition = "2021"
 serde = "1.0.163"
 tokio = { version = "1.28.1", features = ["full"] }
 surrealdb = { git = "https://github.com/surrealdb/surrealdb" }
+geo = { version = "0.25.0", features = ["use-serde"] }
+geojson = "0.24.1"
