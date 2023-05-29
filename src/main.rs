@@ -37,8 +37,9 @@ async fn enum_example(db: &Surreal<Client>) -> Result<()> {
         Village { number: usize },
     }
 
-    db.query("CREATE address SET designator = $designator")
-        .bind(Address {
+    let _: Vec<Address> = db
+        .create("address")
+        .content(Address {
             designator: Designator::Street {
                 number: 10,
                 stair_case: "UV".to_string(),
@@ -46,8 +47,9 @@ async fn enum_example(db: &Surreal<Client>) -> Result<()> {
         })
         .await?;
 
-    db.query("CREATE address SET designator = $designator")
-        .bind(Address {
+    let _: Vec<Address> = db
+        .create("address")
+        .content(Address {
             designator: Designator::Village { number: 15 },
         })
         .await?;
@@ -65,8 +67,9 @@ async fn insert_generic_struct(db: &Surreal<Client>) -> Result<()> {
         data: T,
     }
 
-    db.query("CREATE parent_struct SET data = $data")
-        .bind(ParentStruct::<Cow<'static, str>> {
+    let _: Vec<ParentStruct<Cow<'static, str>>> = db
+        .create("parent_struct")
+        .content(ParentStruct::<Cow<'static, str>> {
             data: "test".into(),
         })
         .await?;
@@ -86,9 +89,7 @@ async fn insert_vec(db: &Surreal<Client>) -> Result<()> {
 
     let parent_structs = vec![ParentStruct::default(), ParentStruct::default()];
     for parent_struct in parent_structs {
-        db.query("CREATE parent_struct SET data = $data")
-            .bind(parent_struct)
-            .await?;
+        let _: Vec<ParentStruct> = db.create("parent_struct").content(parent_struct).await?;
     }
 
     let res: Vec<ParentStruct> = db.select("parent_struct").await?;
